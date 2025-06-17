@@ -110,6 +110,10 @@ function fastifyWebsocket (fastify, opts, next) {
   fastify.decorate('injectWS', injectWS)
 
   function onUpgrade (rawRequest, socket, head) {
+    // Skip Vite’s HMR / ping sockets so they don’t collide with our WS routing
+    const protocol = rawRequest.headers['sec-websocket-protocol'];
+    if (protocol === 'vite-hmr' || protocol === 'vite-ping') return;
+
     // Save a reference to the socket and then dispatch the request through the normal fastify router so that it will invoke hooks and then eventually a route handler that might upgrade the socket.
     rawRequest[kWs] = socket
     rawRequest[kWsHead] = head
