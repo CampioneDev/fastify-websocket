@@ -112,7 +112,9 @@ fastify.get('/*', { websocket: true }, (socket, request) => {
 ```
 ### Using hooks
 
-Routes registered with `@fastify/websocket` respect the Fastify plugin encapsulation contexts, and so will run any hooks that have been registered. This means the same route hooks you might use for authentication or error handling of plain old HTTP handlers will apply to websocket handlers as well.
+Routes registered with `@fastify/websocket` respect the Fastify plugin encapsulation contexts. Hooks that run **before** the websocket connection is established will be called - this includes `onRequest`, `preParsing`, `preValidation`, and `preHandler`. These hooks can be used for authentication or other request-level processing.
+
+However, hooks related to response serialization and transmission (`preSerialization`, `onSend`) **do not run** for websocket routes. Once the connection is upgraded, message handling is outside Fastify's HTTP lifecycle. If you need to transform outgoing websocket messages, implement that logic in your handler before calling `socket.send()`.
 
 ```js
 fastify.addHook('preValidation', async (request, reply) => {
@@ -330,18 +332,16 @@ module.exports = App
 'use strict'
 
 const { test } = require('node:test')
-const Fastify = require('fastify')
-const App = require('./app.js')
+const fastify = require('./app.js')
 
 test('connect to /', async (t) => {
   t.plan(1)
 
-  const fastify = Fastify()
-  fastify.register(App)
   t.after(() => fastify.close())
   await fastify.ready()
 
   const ws = await fastify.injectWS('/', {headers: { "api-key" : "some-random-key" }})
+
   let resolve;
   const promise = new Promise(r => { resolve = r })
 
